@@ -1,0 +1,17 @@
+# HW1 -- Planar Walking Robot.  CPU only; no NVIDIA GPU required.
+# Works on macOS (Intel & Apple Silicon), Windows, and Linux.
+#
+#   python -m venv .venv && source .venv/bin/activate      # (Windows: .venv\Scripts\activate)
+#   pip install -r requirements.txt
+#
+# torch: the default PyPI wheel is CPU-only and is all you need. If pip tries to
+# pull a large CUDA build, force CPU with:
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+mujoco>=3.1,<4
+gymnasium>=1.0,<2
+torch>=2.1
+numpy>=1.24
+imageio>=2.31
+imageio-ffmpeg>=0.4      # mp4 writing for evaluate.py --video
+matplotlib>=3.7          # training-curve plots in the notebook

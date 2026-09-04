@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.venv/
+.ipynb_checkpoints/
+student_version/
+*.mp4
+*.gif
+checkpoints/*.pt
+checkpoints/*.txt
+!checkpoints/reference_policy.pt
+!checkpoints/reference_train_log.txt
+.DS_Store
