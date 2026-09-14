@@ -1,4 +1,4 @@
-# HW1 — Train a 2D Walking Robot with Reinforcement Learning
+# Homework 1 — Train a 2D Walking Robot with Reinforcement Learning
 
 **Advanced Robot Dynamics and Control** · Planar Walking Robot
 
@@ -15,9 +15,7 @@ You will implement three things:
 | **C. Policy/Value network** | `planar_walker/networks.py` → `ActorCritic` | the function approximator |
 
 The PPO training loop itself (`planar_walker/ppo.py`) is **given and fully
-working** — read it, don't rewrite it. Later in the course we will re-derive the
-same walking behavior with model-based trajectory optimization and PD control,
-and compare.
+working** — read it, don't rewrite it.
 
 ---
 
@@ -44,6 +42,7 @@ tune the XML, but you do not need to.
 ## 2. Setup
 
 ```bash
+cd PlanarWalking                   # the homework folder
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
@@ -55,7 +54,8 @@ If `pip install torch` tries to download a huge CUDA build, force the CPU wheel:
 pip install torch --index-url https://download.pytorch.org/whl/cpu
 ```
 
-**Check your install** (loads MuJoCo, steps the env with random torques):
+**Check your install** (loads the model in MuJoCo and steps it with random torques).
+It does not call any of the code you write, so it runs on the handout as shipped:
 
 ```bash
 python play_random.py --steps 200
@@ -91,6 +91,10 @@ upd  120  step   983,040   5100 sps  epRet    780.4  KL 0.018  std 0.42
 Checkpoints are written to `checkpoints/`:
 - `policy.pt` — best eval return so far (use this one)
 - `policy_final.pt` — end of training
+- `policy_step0102400.pt`, ... — periodic snapshots, only if you pass
+  `--save-every-steps 100000` (or set `PPOConfig(save_every_steps=100_000)` in the
+  notebook). Useful for watching how the gait develops; any of them works with
+  `evaluate.py --checkpoint`.
 
 A **reference solution checkpoint** is in `checkpoints/reference_policy.pt` so
 you can see the target behavior before your own run finishes.
@@ -101,8 +105,10 @@ you can see the target behavior before your own run finishes.
 python evaluate.py --checkpoint checkpoints/policy.pt --episodes 10
 python evaluate.py --checkpoint checkpoints/policy.pt --video walk.mp4
 python evaluate.py --checkpoint checkpoints/policy.pt --viewer     # interactive window
-(or mjpython on macOS)
 ```
+
+On macOS the interactive viewer must be started with `mjpython` instead of `python`
+(it ships with the `mujoco` package).
 
 `notebook.ipynb` runs the whole flow (train → curves → video) inline.
 
@@ -120,17 +126,18 @@ A **PDF report** (via the notebook or your own writeup) plus your modified code:
    produced (screenshots/short description).
 3. **Network (Part C).** Report your architecture. Sweep one hyperparameter
    (width, depth, or state-dependent vs. state-independent log-std) and plot the
-   effect on return.
-4. **Result.** Learning curve (return vs. steps), evaluation table
-   (return / distance / speed / episode length over ≥10 seeds-or-episodes), and a
-   video/GIF of the final gait.
-5. **Reflection (½ page).** Where did PPO get stuck? What reward term or
+   effect on return. The state-dependent variant also requires changing
+   `get_action_and_value` in `networks.py`, which is written against `actor_logstd`.
+4. **Result.** Learning curve (return vs. steps), an evaluation table
+   (return / distance / speed / episode length, averaged over at least 10
+   evaluation episodes), and a video/GIF of the final gait.
+5. **Reflection (~200 words).** Where did PPO get stuck? What reward term or
    observation fixed it? What do you expect a model-based controller to do
    differently on this same robot?
 
 **Grading (100 pts):** A 20 · B 30 · C 20 · Result 20 · Reflection 10.
-Bonus (10): reach ≥ 1.3 m/s average speed with episode length ≥ 8 s, or make the
-robot walk *backward* by changing only the reward.
+Bonus (10): reach ≥ 2.0 m/s average speed without falling during the 8 s episode,
+or make the robot walk *backward* by changing only the reward.
 
 ---
 
@@ -147,7 +154,8 @@ planar_walker/
   assets/planar_walker.xml
 train.py         CLI: run training
 evaluate.py      CLI: roll out a checkpoint, save video, or open viewer
-play_random.py   CLI: env sanity check
+play_random.py   CLI: install check (MuJoCo only)
+plot_training.py CLI: learning curves from a saved train.py log
 notebook.ipynb   guided end-to-end version
 ```
 

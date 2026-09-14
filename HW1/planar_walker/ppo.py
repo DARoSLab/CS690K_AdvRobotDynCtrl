@@ -160,6 +160,14 @@ def train(
 
     best_eval = -1e9
 
+    # Periodic snapshots. global_step advances a whole batch (num_envs * num_steps)
+    # per update, so it rarely lands exactly on a multiple of save_every_steps --
+    # save on the first update that CROSSES each threshold, and name the file by
+    # the step it was actually taken at.
+    save_every = int(getattr(ppo_cfg, "save_every_steps", 0) or 0)
+    next_save = save_every
+    step_digits = len(str(ppo_cfg.num_updates * ppo_cfg.batch_size))
+
     for update in range(1, ppo_cfg.num_updates + 1):
         if ppo_cfg.anneal_lr:
             frac = 1.0 - (update - 1.0) / ppo_cfg.num_updates
@@ -230,6 +238,11 @@ def train(
             np.random.shuffle(valid)
             for start in range(0, len(valid), ppo_cfg.minibatch_size):
                 mb = valid[start:start + ppo_cfg.minibatch_size]
+                # Dropping the reset dummies makes the batch size vary, so the last
+                # minibatch can hold a single sample. Its advantage std is NaN
+                # (torch.std of one element), which would poison every weight.
+                if len(mb) < 2:
+                    continue
 
                 _, newlogp, entropy, newval = agent.get_action_and_value(b_obs[mb], b_act[mb])
                 logratio = newlogp - b_logp[mb]
@@ -280,7 +293,9 @@ def train(
                 "entropy": float(ent_loss),
                 "approx_kl": float(approx_kl),
                 "clipfrac": float(np.mean(clipfracs)) if clipfracs else 0.0,
-                "policy_std": float(torch.exp(agent.actor_logstd).mean()),
+                # a state-dependent log-std has no `actor_logstd` parameter to report
+                "policy_std": (float(torch.exp(agent.actor_logstd).mean())
+                               if hasattr(agent, "actor_logstd") else float("nan")),
             }
             (log_fn or _default_log)(row)
 
@@ -290,6 +305,13 @@ def train(
             if ev["eval/return_mean"] > best_eval:
                 best_eval = ev["eval/return_mean"]
                 save_checkpoint(ckpt_path, agent, obs_rms, env_cfg, ppo_cfg)
+
+        if save_every > 0 and global_step >= next_save:
+            snap = ckpt_path.replace(".pt", f"_step{global_step:0{step_digits}d}.pt")
+            save_checkpoint(snap, agent, obs_rms, env_cfg, ppo_cfg)
+            print(f"  [snapshot] step={global_step:>9,}  -> {snap}")
+            while next_save <= global_step:       # skip thresholds this update jumped past
+                next_save += save_every
 
     envs.close()
     save_checkpoint(ckpt_path.replace(".pt", "_final.pt"), agent, obs_rms, env_cfg, ppo_cfg)

@@ -1,20 +1,25 @@
 #!/usr/bin/env python3
-"""Sanity-check the environment with random / zero actions.
+"""Sanity-check the install: load the walker model and step it with random / zero torques.
 
-    python play_random.py                 # print a few steps of rollout data
+    python play_random.py                  # print a few steps of rollout data
     python play_random.py --video rnd.mp4  # save a short clip
-    python play_random.py --viewer         # interactive window (needs a display)
+    python play_random.py --viewer         # interactive window (macOS: run with mjpython)
 
-Use this first, before training, to confirm MuJoCo is installed and the model
-loads on your machine.
+Run this first, before training. It uses MuJoCo directly and none of the code you
+write in Parts A-C, so it works on a fresh handout: a failure here is an install
+problem, not a bug in your solution.
 """
 from __future__ import annotations
 
 import argparse
+import sys
+import time
 
+import mujoco
 import numpy as np
 
-from planar_walker.env import PlanarWalkerEnv, QPOS_NAMES
+from planar_walker.config import EnvConfig
+from planar_walker.env import QPOS_NAMES, load_model
 
 
 def main():
@@ -25,35 +30,59 @@ def main():
     p.add_argument("--viewer", action="store_true")
     a = p.parse_args()
 
-    render_mode = "rgb_array" if a.video else ("human" if a.viewer else None)
-    env = PlanarWalkerEnv(render_mode=render_mode)
-    print(f"obs dim = {env.observation_space.shape[0]}, act dim = {env.action_space.shape[0]}")
+    cfg = EnvConfig()
+    model = load_model()
+    data = mujoco.MjData(model)
+    z_lo, z_hi = cfg.reward.healthy_z_range
+    print(f"nq = {model.nq}, nv = {model.nv}, nu = {model.nu}")
     print(f"qpos layout: {QPOS_NAMES}")
-    print(f"control dt  = {env.cfg.control_dt:.4f} s, max episode steps = {env.cfg.max_episode_steps}")
+    print(f"control dt  = {cfg.control_dt:.4f} s, max episode steps = {cfg.max_episode_steps}")
 
-    obs, _ = env.reset(seed=0)
-    frames, total_r = [], 0.0
+    renderer = mujoco.Renderer(model, height=720, width=960) if a.video else None
+    viewer = None
+    if a.viewer:
+        from mujoco import viewer as mj_viewer   # submodule; not loaded by `import mujoco`
+
+        try:
+            viewer = mj_viewer.launch_passive(model, data)
+        except RuntimeError as e:
+            if sys.platform == "darwin":
+                raise SystemExit("On macOS the interactive viewer must be launched with mjpython:\n"
+                                 "    mjpython " + " ".join(sys.argv)) from e
+            raise
+
+    rng = np.random.default_rng(0)
+    mujoco.mj_resetData(model, data)
+    mujoco.mj_forward(model, data)
+    frames = []
     for t in range(a.steps):
-        action = np.zeros(env.action_space.shape) if a.zero else env.action_space.sample()
-        obs, r, term, trunc, info = env.step(action)
-        total_r += r
-        if a.video:
-            frames.append(env.render())
+        data.ctrl[:] = 0.0 if a.zero else rng.uniform(-1.0, 1.0, model.nu)
+        mujoco.mj_step(model, data, nstep=cfg.frame_skip)
         if t < 5:
-            print(f"  t={t:3d}  r={r:+.3f}  x={info['x_position']:+.3f}  "
-                  f"healthy={info['is_healthy']}  vx={info['x_velocity']:+.2f}")
-        if term or trunc:
-            print(f"  episode ended at t={t} (terminated={term}, truncated={trunc})")
-            obs, _ = env.reset()
-    print(f"total reward over {a.steps} steps: {total_r:.2f}")
+            print(f"  t={t:3d}  x={data.qpos[0]:+.3f}  z={data.qpos[1]:+.3f}  pitch={data.qpos[2]:+.3f}")
+        if renderer is not None:
+            renderer.update_scene(data, camera="track")
+            frames.append(renderer.render())
+        if viewer is not None:
+            if not viewer.is_running():
+                break
+            viewer.sync()
+            time.sleep(cfg.control_dt)
+        if not z_lo < data.qpos[1] < z_hi:
+            print(f"  torso height left the default range at t={t} (z = {data.qpos[1]:.2f} m); resetting")
+            mujoco.mj_resetData(model, data)
+            mujoco.mj_forward(model, data)
+    print(f"ran {a.steps} control steps")
 
-    if a.video:
+    if renderer is not None:
         import imageio
 
-        fps = int(round(1.0 / env.cfg.control_dt))
+        fps = int(round(1.0 / cfg.control_dt))
         imageio.mimsave(a.video, frames, fps=fps)
+        renderer.close()
         print(f"wrote {a.video}")
-    env.close()
+    if viewer is not None:
+        viewer.close()
 
 
 if __name__ == "__main__":

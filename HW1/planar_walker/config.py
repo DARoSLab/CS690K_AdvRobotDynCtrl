@@ -81,6 +81,8 @@ class PPOConfig:
     torch_threads: int = 4             # keep CPU usage friendly on a laptop
     eval_every_updates: int = 20
     log_every_updates: int = 1
+    save_every_steps: int = 0          # >0: also keep a snapshot every N env steps
+                                       #     (checkpoints/policy_step0102400.pt, ...)
 
     @property
     def batch_size(self) -> int:

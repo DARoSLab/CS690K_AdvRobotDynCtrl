@@ -7,11 +7,13 @@ Examples
     python train.py --total-timesteps 300000     # quick smoke test
     python train.py --num-envs 4 --seed 1
     python train.py --target-speed 1.5 --ctrl-cost-weight 5e-4
+    python train.py --save-every-steps 100000    # also keep a snapshot every 100k steps
 
 Outputs
 -------
     checkpoints/policy.pt         best-so-far (by eval return)
     checkpoints/policy_final.pt   policy at the end of training
+    checkpoints/policy_stepNNNNNNN.pt   periodic snapshots (only with --save-every-steps)
 Then visualise with:
     python evaluate.py --checkpoint checkpoints/policy.pt --video walk.mp4
 """
@@ -48,6 +50,7 @@ def build_configs(a: argparse.Namespace):
         torch_threads=a.torch_threads,
         hidden_sizes=tuple(a.hidden_sizes),
         eval_every_updates=a.eval_every_updates,
+        save_every_steps=a.save_every_steps,
     )
     return env_cfg, ppo_cfg
 
@@ -73,6 +76,8 @@ def main():
     p.add_argument("--ent-coef", type=float, default=0.0)
     p.add_argument("--hidden-sizes", type=int, nargs="+", default=[64, 64])
     p.add_argument("--eval-every-updates", type=int, default=20)
+    p.add_argument("--save-every-steps", type=int, default=500_000,
+                   help="also save a snapshot every N env steps (0 = off)")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--torch-threads", type=int, default=4)
     p.add_argument("--checkpoint", type=str, default="checkpoints/policy.pt")

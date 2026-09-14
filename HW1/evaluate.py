@@ -10,6 +10,7 @@ Examples
 from __future__ import annotations
 
 import argparse
+import sys
 
 import numpy as np
 import torch
@@ -43,7 +44,7 @@ def rollout(agent, obs_rms, env_cfg, episodes, seed, render, obs_clip):
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--checkpoint", required=True)
-    p.add_argument("--episodes", type=int, default=10)
+    p.add_argument("--episodes", type=int, default=20)
     p.add_argument("--seed", type=int, default=10_000)
     p.add_argument("--video", type=str, default=None, help="path to .mp4 or .gif to write")
     p.add_argument("--viewer", action="store_true", help="open an interactive MuJoCo window")
@@ -80,7 +81,14 @@ def _run_viewer(agent, obs_rms, env_cfg):
 
     env = PlanarWalkerEnv(cfg=env_cfg)
     obs, _ = env.reset(seed=0)
-    with mujoco.viewer.launch_passive(env.model, env.data) as viewer:
+    try:
+        ctx = mujoco.viewer.launch_passive(env.model, env.data)
+    except RuntimeError as e:
+        if sys.platform == "darwin":
+            raise SystemExit("On macOS the interactive viewer must be launched with mjpython:\n"
+                             "    mjpython " + " ".join(sys.argv)) from e
+        raise
+    with ctx as viewer:
         import time
 
         while viewer.is_running():

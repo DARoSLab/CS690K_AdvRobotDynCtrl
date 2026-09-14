@@ -5,7 +5,7 @@
 ============================================================================
 `ActorCritic` below is a reference solution: two separate tanh MLPs (one for
 the policy mean, one for the value), a *state-independent* log-std parameter,
-and orthogonal weight init.  For the assignment, the body of `__init__` and
+and orthogonal weight init.  For the assignment, the bodies of `__init__` and
 `_build_mlp` are removed and you build the networks.
 
 Questions to explore:
@@ -32,26 +32,20 @@ def layer_init(layer: nn.Linear, std: float = np.sqrt(2), bias_const: float = 0.
 
 
 def _build_mlp(in_dim: int, hidden: Tuple[int, ...], out_dim: int, out_std: float) -> nn.Sequential:
-    # === HW SOLUTION START: networks.build_mlp ===
-    layers = []
-    last = in_dim
-    for h in hidden:
-        layers += [layer_init(nn.Linear(last, h)), nn.Tanh()]
-        last = h
-    layers += [layer_init(nn.Linear(last, out_dim), std=out_std)]
-    return nn.Sequential(*layers)
-    # === HW SOLUTION END: networks.build_mlp ===
+    # TODO (HW1 Part C): build an MLP  in_dim -> hidden... -> out_dim.
+    # Use layer_init(nn.Linear(...)) for the weights; the final layer uses std=out_std.
+    raise NotImplementedError("HW1 Part C: implement _build_mlp")
 
 
 class ActorCritic(nn.Module):
     def __init__(self, obs_dim: int, act_dim: int, hidden: Tuple[int, ...] = (64, 64)):
         super().__init__()
-        # === HW SOLUTION START: networks.actor_critic_init ===
-        self.actor_mean = _build_mlp(obs_dim, hidden, act_dim, out_std=0.01)
-        self.critic = _build_mlp(obs_dim, hidden, 1, out_std=1.0)
-        # state-independent log std, initialised so std ~= 1.0
-        self.actor_logstd = nn.Parameter(torch.zeros(1, act_dim))
-        # === HW SOLUTION END: networks.actor_critic_init ===
+        # TODO (HW1 Part C): create the actor and critic networks and the log-std.
+        # Needed attributes (used elsewhere in this class):
+        #   self.actor_mean : nn.Module  obs -> action mean
+        #   self.critic     : nn.Module  obs -> state value (shape [...,1])
+        #   self.actor_logstd : nn.Parameter of shape (1, act_dim)
+        raise NotImplementedError("HW1 Part C: implement ActorCritic.__init__")
 
     def get_value(self, obs: torch.Tensor) -> torch.Tensor:
         return self.critic(obs).squeeze(-1)

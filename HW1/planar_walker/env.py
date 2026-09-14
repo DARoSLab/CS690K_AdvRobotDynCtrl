@@ -46,6 +46,21 @@ QPOS_NAMES = [
 ]
 
 
+def load_model() -> mujoco.MjModel:
+    """Load the walker MJCF with the timestep and offscreen size this homework uses.
+
+    Independent of Parts A-C, so it can be used to check the install before any of
+    the student code exists.
+    """
+    model = mujoco.MjModel.from_xml_path(_ASSET)
+    model.opt.timestep = 0.002
+    # MuJoCo caps offscreen rendering at <global offwidth/offheight>; raise it so a
+    # 960x720 render never fails with an opaque framebuffer error.
+    model.vis.global_.offwidth = max(model.vis.global_.offwidth, 960)
+    model.vis.global_.offheight = max(model.vis.global_.offheight, 720)
+    return model
+
+
 class PlanarWalkerEnv(gym.Env):
     metadata = {"render_modes": ["rgb_array", "human"], "render_fps": 125}
 
@@ -53,8 +68,7 @@ class PlanarWalkerEnv(gym.Env):
         self.cfg = cfg or EnvConfig()
         self.render_mode = render_mode
 
-        self.model = mujoco.MjModel.from_xml_path(_ASSET)
-        self.model.opt.timestep = 0.002
+        self.model = load_model()
         self.data = mujoco.MjData(self.model)
 
         self.nq = self.model.nq          # 9
@@ -82,14 +96,10 @@ class PlanarWalkerEnv(gym.Env):
     # observation                                                        #
     # ------------------------------------------------------------------ #
     def _get_obs(self) -> np.ndarray:
-        # === HW SOLUTION START: env.get_obs ===
-        qpos = self.data.qpos.copy()
-        qvel = self.data.qvel.copy()
-        if self.cfg.exclude_current_positions:
-            qpos = qpos[1:]              # drop absolute x -> policy is translation invariant
-        qvel = np.clip(qvel, -10.0, 10.0)
-        return np.concatenate([qpos, qvel]).astype(np.float32)
-        # === HW SOLUTION END: env.get_obs ===
+        # TODO (HW1 Part A): build the observation vector.
+        # Use self.data.qpos (len 9) and self.data.qvel (len 9).
+        # Return a 1-D np.float32 array. Decide what to include / exclude / scale.
+        raise NotImplementedError("HW1 Part A: implement _get_obs")
 
     # ------------------------------------------------------------------ #
     # gym API                                                            #
@@ -140,7 +150,7 @@ class PlanarWalkerEnv(gym.Env):
     def render(self):
         if self.render_mode == "rgb_array":
             if self._renderer is None:
-                self._renderer = mujoco.Renderer(self.model, height=480, width=640)
+                self._renderer = mujoco.Renderer(self.model, height=720, width=960)
             self._renderer.update_scene(self.data, camera="track")
             return self._renderer.render()
         if self.render_mode == "human":

@@ -4,7 +4,7 @@
  HW1  -- PART B : REWARD DESIGN                          [student section]
 ============================================================================
 `compute_reward` and `is_healthy` below contain a *reference* solution that
-produces a stable ~1 m/s walking gait.  For the assignment these bodies are
+produces a stable forward gait.  For the assignment these bodies are
 replaced by `raise NotImplementedError(...)` and you design your own.
 
 Things worth thinking about:
