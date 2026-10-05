@@ -1,0 +1,85 @@
+<!--
+  ForteArm -- HOMEWORK SCENE.
+
+  `Forte.xml` is the bare robot (converted from the designer's URDF). This file
+  wraps it with the things a homework needs: ground, lighting, cameras, a target
+  marker, and simulation options. Load THIS file, not Forte.xml:
+
+      m = mujoco.MjModel.from_xml_path("ForteArm/ForteArm_Model/forte_scene.xml")
+
+  -------------------------------------------------------------------------
+  The robot
+  -------------------------------------------------------------------------
+    7 revolute joints, all actuated by torque motors (gear = 1, so ctrl is the
+    joint torque in N*m):
+
+      idx  joint            axis   torque limit
+       0   shoulder_yaw      z       +-28 Nm
+       1   shoulder_pitch    y       +-100 Nm
+       2   shoulder_roll     x       +-30 Nm
+       3   elbow_pitch       y       +-45 Nm
+       4   lower_arm_roll    x       +-45 Nm
+       5   wrist_pitch       y       +-10 Nm
+       6   wrist_roll        x       +-5 Nm
+
+    Task space is 6-D (position + orientation) but the arm has 7 joints, so the
+    end-effector Jacobian is 6x7 with rank 6 and a ONE-DIMENSIONAL NULL SPACE.
+    The arm is redundant: infinitely many joint configurations reach the same
+    end-effector pose, and there is a whole direction of joint motion that does
+    not move the tool at all. HW4 (Newton-Raphson IK) and HW5 (operational-space
+    control) both lean on this -- it is why you need a pseudo-inverse rather
+    than an inverse, and it is what null-space posture control acts on.
+
+    End-effector frame: site `ee_tip` (see Forte.xml). Reach ~1.18 m.
+
+    Keyframes:
+      0 `init_pose`   all zeros. Arm straight out along +x. NOTE this is a
+                      singular configuration -- do not start IK here.
+      1 `ready_pose`  q = [0, -0.6, 0, 1.2, 0, -0.6, 0], elbow bent. Well
+                      conditioned; use this as the IK / OSC starting pose.
+-->
+<mujoco model="forte_scene">
+  <include file="Forte.xml"/>
+
+  <option timestep="0.002" integrator="implicitfast" iterations="50"/>
+
+  <statistic center="0.4 0 0.3" extent="1.4"/>
+
+  <visual>
+    <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <global azimuth="140" elevation="-25" offwidth="1280" offheight="960"/>
+    <map znear="0.02"/>
+  </visual>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="3072"/>
+    <texture type="2d" name="groundplane" builtin="checker" mark="edge"
+             rgb1="0.2 0.3 0.4" rgb2="0.1 0.2 0.3" markrgb="0.8 0.8 0.8"
+             width="300" height="300"/>
+    <material name="groundplane" texture="groundplane" texuniform="true"
+              texrepeat="5 5" reflectance="0.1"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0.5 0 2.5" dir="0 0 -1" directional="true"/>
+    <!-- The arm's base sits at z = 0. The floor is dropped 1 mm and made
+         non-colliding so it never fights the base mesh; it is a visual
+         reference, not a contact surface. -->
+    <geom name="floor" type="plane" pos="0 0 -0.001" size="0 0 0.05"
+          material="groundplane" contype="0" conaffinity="0"/>
+    <camera name="side"  pos="0.5 -2.0 0.6" xyaxes="1 0 0 0 0.3 1"/>
+    <camera name="front" pos="2.2  0.0 0.7" xyaxes="0 1 0 -0.3 0 1"/>
+    <camera name="iso"   pos="1.6 -1.6 1.3" xyaxes="0.7 0.7 0 -0.4 0.4 0.8"/>
+
+    <!-- Visual-only marker for the commanded end-effector target. Move it with
+             m.body("target").mocap ... or  d.mocap_pos[0] = p_desired
+         It has no mass and no collision, so it cannot disturb the arm. -->
+    <body name="target" mocap="true" pos="0.6 0.2 0.5">
+      <site name="target_site" type="sphere" size="0.028" rgba="0.2 0.9 0.2 0.45"/>
+      <site name="target_x" type="box" size="0.075 0.006 0.006" pos="0.075 0 0" rgba="1 0.15 0.15 0.95"/>
+      <site name="target_y" type="box" size="0.006 0.075 0.006" pos="0 0.075 0" rgba="0.15 1 0.15 0.95"/>
+      <site name="target_z" type="box" size="0.006 0.006 0.075" pos="0 0 0.075" rgba="0.3 0.4 1 0.95"/>
+    </body>
+  </worldbody>
+</mujoco>

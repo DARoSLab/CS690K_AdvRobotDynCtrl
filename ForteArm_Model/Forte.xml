@@ -1,0 +1,137 @@
+<mujoco model="ForteME_urdf">
+  <compiler angle="radian"/>
+
+  <!-- Reflected rotor inertia. The URDF carries only link inertias, and the
+       distal links are tiny (the end effector is 63 g), which leaves the mass
+       matrix very badly conditioned: cond(M) ~ 7000 and the task-space inertia
+       Lambda ~ 5e4. Operational-space control has to invert both, so that is a
+       numerical problem, not just an aesthetic one.
+
+       A real geared joint adds its rotor inertia times the gear ratio squared,
+       which dominates the link inertia for small links. Adding a modest
+       armature restores sane conditioning:
+
+           armature   cond(M) median   cond(Lambda) median
+             0.000         7017              54008
+             0.010           38                663
+
+       Damping is deliberately left at 0: MuJoCo puts joint damping in
+       qfrc_passive, NOT qfrc_bias, so a damped joint would add a term the
+       standard OSC law does not compensate. Keeping it at 0 means the HW5
+       model is exact. (Turning damping on and watching tracking degrade is a
+       good optional exercise.) -->
+  <!-- Joint travel limits.
+
+       Anatomical, not "one full revolution on everything".
+
+       Sign convention (standard right-hand rule, unchanged from the original
+       model): the pitch joints rotate about +y, so a POSITIVE angle swings the
+       link DOWNWARD and a negative angle swings it up.
+
+         * shoulder_pitch  +-90 deg  (negative lifts the arm)
+         * elbow_pitch     [0, 180]  0 is fully stretched; positive folds the
+                                     forearm inward. It cannot hyperextend.
+         * wrist_pitch     +-90 deg
+         * the three roll/yaw joints keep their full turn.
+
+       Consequence for inverse kinematics: q and q + 2*pi are no longer the same
+       arm pose for the limited joints, so a solver may NOT wrap angles -- it has
+       to project back into the box. See HW4 Q7.
+
+       Consequence for reachability: because the elbow only folds downward, a
+       high tool pose needs the shoulder pitched up AND the elbow near straight.
+       Targets above z = 0.5 therefore sit in a shell roughly 0.70-1.18 m out
+       from the base -- the arm cannot be both high and tucked in close. -->
+  <default>
+    <joint armature="0.01" damping="0"/>
+  </default>
+
+  <asset>
+    <mesh name="base_link" file="meshes/base_link.stl"/>
+    <mesh name="shoulder_yaw_link" file="meshes/shoulder_yaw_link.stl"/>
+    <mesh name="shoulder_pitch_link" file="meshes/shoulder_pitch_link.stl"/>
+    <mesh name="upper_arm_link" file="meshes/upper_arm_link.stl"/>
+    <mesh name="elbow_link" file="meshes/elbow_link.stl"/>
+    <mesh name="lower_arm_link" file="meshes/lower_arm_link.stl"/>
+    <mesh name="wrist_link" file="meshes/wrist_link.stl"/>
+    <mesh name="end_effector_link" file="meshes/end_effector_link.stl"/>
+  </asset>
+
+  <worldbody>
+    <!-- Visual only. MuJoCo's automatic parent/child contact exclusion does NOT
+         apply when the parent is the world body, so without contype/conaffinity=0
+         this base mesh permanently overlaps shoulder_yaw_link (they interpenetrate
+         by design, exactly as the real parts do) and injects a spurious ~13.7 Nm
+         torque into shoulder_yaw in EVERY pose. -->
+    <geom name="base_link_geom" type="mesh" rgba="0.723666 0.709829 0.56081 1"
+          mesh="base_link" contype="0" conaffinity="0"/>
+    <body name="shoulder_yaw_link" pos="0 0 0.052">
+      <inertial pos="-0.0004308 0.0162677 0.050495" quat="0.421511 0.56486 -0.569966 0.422376" mass="5.03336" diaginertia="0.0415749 0.0298781 0.0227324"/>
+      <joint name="shoulder_yaw" pos="0 0 0" axis="0 0 1" range="-3.14159 3.14159"/>
+      <geom name="shoulder_yaw_link_geom" type="mesh" rgba="0.723666 0.709829 0.56081 1" mesh="shoulder_yaw_link" contype="0" conaffinity="0"/>
+      <body name="shoulder_pitch_link" pos="0 -0.063 0.125">
+        <inertial pos="0.0231942 0.0913164 7.827e-05" quat="-0.224575 0.671616 0.222987 0.669907" mass="0.598655" diaginertia="0.00257241 0.00239093 0.000750547"/>
+        <joint name="shoulder_pitch" pos="0 0 0" axis="0 1 0" range="-1.5708 1.5708"/>
+        <geom name="shoulder_pitch_link_geom" type="mesh" rgba="0.723666 0.709829 0.56081 1" mesh="shoulder_pitch_link" contype="0" conaffinity="0"/>
+        <body name="upper_arm_link" pos="0.0005 0.063 0">
+          <inertial pos="0.164528 -0.00229075 7.89e-06" quat="0.501033 0.502213 0.497762 0.498979" mass="0.996095" diaginertia="0.0155833 0.0155469 0.000839826"/>
+          <joint name="shoulder_roll" pos="0 0 0" axis="1 0 0" range="-1.5708 1.5708"/>
+          <geom name="upper_arm_link_geom" type="mesh" rgba="0.723666 0.709829 0.56081 1" mesh="upper_arm_link" contype="0" conaffinity="0"/>
+          <body name="elbow_link" pos="0.4295 -0.034 0">
+            <inertial pos="0.00516413 0.0339982 0.0294913" quat="0.706924 -0.0120121 -0.0119342 0.707087" mass="0.386275" diaginertia="0.00060413 0.000458656 0.000375324"/>
+            <joint name="elbow_pitch" pos="0 0 0" axis="0 1 0" range="0 3.14159"/>
+            <geom name="elbow_link_geom" type="mesh" rgba="0.723666 0.709829 0.56081 1" mesh="elbow_link" contype="0" conaffinity="0"/>
+            <body name="lower_arm_link" pos="0.0605 0.034 0.035">
+              <inertial pos="0.188373 -2.74e-06 -9.86e-06" quat="-0.000608358 0.707165 -0.000633336 0.707048" mass="0.530881" diaginertia="0.00709904 0.00708678 0.00011648"/>
+              <joint name="lower_arm_roll" pos="0 0 0" axis="1 0 0" range="-3.14159 3.14159"/>
+              <geom name="lower_arm_link_geom" type="mesh" rgba="0.723666 0.709829 0.56081 1" mesh="lower_arm_link" contype="0" conaffinity="0"/>
+              <body name="wrist_link" pos="0.3865 -0.0285 0">
+                <inertial pos="0.0411542 0.0292951 -0.00014264" quat="0.0234432 0.706698 -0.0238223 0.706725" mass="0.169999" diaginertia="0.00022648 0.000184952 9.26882e-05"/>
+                <joint name="wrist_pitch" pos="0 0 0" axis="0 1 0" range="-1.5708 1.5708"/>
+                <geom name="wrist_link_geom" type="mesh" rgba="0.723666 0.709829 0.56081 1" mesh="wrist_link" contype="0" conaffinity="0"/>
+                <body name="end_effector_link" pos="0.087 0.0285 0">
+                  <inertial pos="0.0348448 0.0104082 0.010408" quat="0.309854 0.748054 0.224582 0.542188" mass="0.0631817" diaginertia="6.36672e-05 4.851e-05 4.84128e-05"/>
+                  <joint name="wrist_roll" pos="0 0 0" axis="1 0 0" range="-3.14159 3.14159"/>
+                  <geom name="end_effector_link_geom" type="mesh" rgba="0.723666 0.709829 0.56081 1" mesh="end_effector_link" contype="0" conaffinity="0"/>
+                  <!-- Tool Control Point. Every link of this arm extends along its
+                       own +x, so the TCP is a 4 cm extension of the last link.
+                       This is the frame HW3/HW4/HW5 command: use
+                         mujoco.mj_jacSite(m, d, Jp, Jr, site_id("ee_tip"))
+                       for the 6xN end-effector Jacobian, and d.site_xpos /
+                       d.site_xmat for its pose. Max reach ~1.18 m. -->
+                  <site name="ee_tip" pos="0.04 0 0" size="0.018" rgba="1 0.85 0.1 1"/>
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+  <!-- Per-actuator torque limits. NOTE: the joints used to also carry a uniform
+       actuatorfrcrange="-10 10", which MuJoCo's autolimits turns into an ACTIVE
+       clamp that silently overrode these numbers (every joint was really 10 Nm,
+       vs 9.11 Nm of worst-case gravity load -- almost no headroom). That
+       boilerplate has been removed, so these motor limits now govern. -->
+  <actuator>
+    <motor joint="shoulder_yaw" ctrllimited="true" ctrlrange="-28 28" gear="1" forcerange="-28 28"/>
+    <motor joint="shoulder_pitch" ctrllimited="true" ctrlrange="-100 100" gear="1" forcerange="-100 100"/>
+    <motor joint="shoulder_roll" ctrllimited="true" ctrlrange="-30 30" gear="1" forcerange="-30 30"/>
+    <motor joint="elbow_pitch" ctrllimited="true" ctrlrange="-45 45" gear="1" forcerange="-45 45"/>
+    <motor joint="lower_arm_roll" ctrllimited="true" ctrlrange="-45 45" gear="1" forcerange="-45 45"/>
+    <motor joint="wrist_pitch" ctrllimited="true" ctrlrange="-10 10" gear="1" forcerange="-10 10"/>
+    <motor joint="wrist_roll" ctrllimited="true" ctrlrange="-5 5" gear="1" forcerange="-5 5"/>
+  </actuator>
+  <keyframe>
+    <!-- 7 joints: shoulder_yaw, shoulder_pitch, shoulder_roll,
+                   elbow_pitch, lower_arm_roll, wrist_pitch, wrist_roll -->
+    <key name="init_pose" qpos="0 0 0 0 0 0 0"
+                          qvel="0 0 0 0 0 0 0" />
+    <!-- A non-singular "ready" pose: shoulder pitched up, elbow folded, wrist
+         levelled. Tool sits at (0.546, 0, 0.585) with sigma_min 0.276 and
+         cond(J) 6.8 -- the best-conditioned pose in this arm's travel range,
+         and comfortably above the work surface. IK / OSC start here. -->
+    <key name="ready_pose" qpos="0 -1.5 0 1.85 0 -1.2 0"
+                           qvel="0 0 0 0 0 0 0" />
+  </keyframe>
+</mujoco>
