@@ -29,7 +29,7 @@
        link DOWNWARD and a negative angle swings it up.
 
          * shoulder_pitch  +-90 deg  (negative lifts the arm)
-         * elbow_pitch     [0, 180]  0 is fully stretched; positive folds the
+         * elbow_pitch     [0, 140]  0 is fully stretched; positive folds the
                                      forearm inward. It cannot hyperextend.
          * wrist_pitch     +-90 deg
          * the three roll/yaw joints keep their full turn.
@@ -79,7 +79,7 @@
           <geom name="upper_arm_link_geom" type="mesh" rgba="0.723666 0.709829 0.56081 1" mesh="upper_arm_link" contype="0" conaffinity="0"/>
           <body name="elbow_link" pos="0.4295 -0.034 0">
             <inertial pos="0.00516413 0.0339982 0.0294913" quat="0.706924 -0.0120121 -0.0119342 0.707087" mass="0.386275" diaginertia="0.00060413 0.000458656 0.000375324"/>
-            <joint name="elbow_pitch" pos="0 0 0" axis="0 1 0" range="0 3.14159"/>
+            <joint name="elbow_pitch" pos="0 0 0" axis="0 1 0" range="0 2.44346"/>
             <geom name="elbow_link_geom" type="mesh" rgba="0.723666 0.709829 0.56081 1" mesh="elbow_link" contype="0" conaffinity="0"/>
             <body name="lower_arm_link" pos="0.0605 0.034 0.035">
               <inertial pos="0.188373 -2.74e-06 -9.86e-06" quat="-0.000608358 0.707165 -0.000633336 0.707048" mass="0.530881" diaginertia="0.00709904 0.00708678 0.00011648"/>
