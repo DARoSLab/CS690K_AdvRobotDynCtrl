@@ -140,18 +140,29 @@ def show_video(frames, fps: int = 15, path: str = "_viz.mp4", width: int = 720):
     `width` is the on-screen width of the embedded player, not the encoded
     resolution -- that comes from the frames, i.e. from ForteViz's width/height.
 
-    The mp4 (H.264) is kept at `path`, but the inline player embeds a VP9 .webm
-    copy: VS Code's notebook view cannot decode H.264 and shows a blank player.
+    The mp4 (H.264) is kept at `path`, and a VP9 .webm copy next to it. The
+    inline player embeds both as <source> tags, so each front end (Jupyter in a
+    browser, VS Code, Colab) plays whichever codec it can decode instead of
+    showing a blank player.
     """
+    import base64
     import imageio
-    from IPython.display import Video
+    from IPython.display import HTML
     frames = list(frames)
     imageio.mimsave(path, frames, fps=fps, macro_block_size=1)
     webm = os.path.splitext(path)[0] + ".webm"
     imageio.mimsave(webm, frames, fps=fps, codec="libvpx-vp9", macro_block_size=1,
                     output_params=["-crf", "32", "-b:v", "0",
                                    "-deadline", "realtime", "-cpu-used", "8"])
-    return Video(webm, embed=True, width=width, mimetype="video/webm")
+
+    def src(p, mime):
+        with open(p, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode("ascii")
+        return f'<source src="data:{mime};base64,{b64}" type="{mime}">'
+
+    return HTML(f'<video controls loop width="{width}">'
+                f'{src(path, "video/mp4")}{src(webm, "video/webm")}'
+                f'</video>')
 
 
 def filmstrip(frames, n: int = 6, path: Optional[str] = None,
